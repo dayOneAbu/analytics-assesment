@@ -6,7 +6,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string(),
   JWT_EXPIRES_IN: z.string().default('24h'),
   PORT: z.string().default('3000'),
-  REDIS_URL: z.string(),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
 })
 
 const parsed = envSchema.safeParse(process.env)

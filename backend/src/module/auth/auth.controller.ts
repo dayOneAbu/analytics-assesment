@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import { RegisterSchema, LoginSchema } from './auth.schema'
 import { AuthService } from './auth.service'
-import { formatZodErrors } from '../../lib/errors'
+import { formatZodErrors, toSafeApiError } from '../../lib/errors'
+ 
 
 const authService = new AuthService()
 
@@ -26,11 +27,13 @@ export class AuthController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message || 'Internal server error',
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
@@ -55,11 +58,13 @@ export class AuthController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message || 'Internal server error',
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }

@@ -1,8 +1,8 @@
 import { Request, Response } from 'express'
 import { ArticleService } from './article.service'
-import { CreateArticleSchema, UpdateArticleSchema, ArticleQuerySchema } from './article.schema'
+import { CreateArticleSchema, UpdateArticleSchema, ArticleQuerySchema, PaginationSchema } from './article.schema'
 import { AuthenticatedRequest } from '../../types/index'
-import { formatZodErrors } from '../../lib/errors'
+import { formatZodErrors, toSafeApiError } from '../../lib/errors'
 
 const articleService = new ArticleService()
 
@@ -29,11 +29,13 @@ export class ArticleController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message,
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
@@ -62,11 +64,13 @@ export class ArticleController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message,
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
@@ -76,16 +80,19 @@ export class ArticleController {
 
     try {
       const article = await articleService.getById(req.params.id as string)
+      const actorKey = authReq.user?.id ? `user:${authReq.user.id}` : `guest:${req.ip || 'unknown'}`
+      const dedupeBucket = Math.floor(Date.now() / 10_000)
+      const readLogJobId = `read:${article.id}:${actorKey}:${dedupeBucket}`
 
-     
-      import('../../queue/index')
-        .then(({ readLogQueue }) => {
-          readLogQueue.add('log-read', {
-            articleId: article.id,
-            readerId: authReq.user?.id ?? null
-          })
-        })
-        .catch(() => {})  
+      void import('../../queue/index')
+        .then(({ readLogQueue }) => readLogQueue.add('log-read', {
+          articleId: article.id,
+          readerId: authReq.user?.id ?? null
+        }, {
+          jobId: readLogJobId,
+          removeOnComplete: true,
+        }))
+        .catch(() => {})
       return res.status(200).json({
         Success: true,
         Message: 'Article fetched successfully',
@@ -93,19 +100,31 @@ export class ArticleController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 404).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message,
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
 
   async getMyArticles(req: Request, res: Response) {
     const authReq = req as AuthenticatedRequest
-    const page = Number(req.query.page) || 1
-    const pageSize = Number(req.query.pageSize) || 10
+    const parsed = PaginationSchema.safeParse(req.query)
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        Success: false,
+        Message: 'Invalid query parameters',
+        Object: null,
+        Errors: formatZodErrors(parsed.error)
+      })
+    }
+
+    const { page, pageSize } = parsed.data
 
     try {
       const { articles, total } = await articleService.getMyArticles(authReq.user.id, page, pageSize)
@@ -119,11 +138,13 @@ export class ArticleController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message,
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
@@ -150,11 +171,13 @@ export class ArticleController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message,
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
@@ -171,11 +194,13 @@ export class ArticleController {
         Errors: null
       })
     } catch (err: any) {
-      return res.status(err.status || 500).json({
+      const safeError = toSafeApiError(err)
+
+      return res.status(safeError.status).json({
         Success: false,
-        Message: err.message,
+        Message: safeError.message,
         Object: null,
-        Errors: [err.message]
+        Errors: safeError.errors
       })
     }
   }
